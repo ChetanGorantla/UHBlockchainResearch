@@ -1,0 +1,70 @@
+import time
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Define the model and tokenizer for MiniCPM3-4B
+path = "openbmb/MiniCPM3-4B"
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.bfloat16, device_map="auto", trust_remote_code=True).to(device)
+
+# Define the messages (prompt)
+minicpm_prompt = [
+    {"role": "user", "content": "What is 2+2?"}
+]
+
+# Function to test MiniCPM3-4B on a node with all performance metrics
+def test_minicpm_model(node_url, messages, retries=3, timeout=10):
+    attempt = 0
+    while attempt < retries:
+        try:
+            start_time = time.time()  # Start time for the entire process
+
+            # Apply the chat template for MiniCPM3-4B
+            model_inputs = tokenizer.apply_chat_template(messages, return_tensors="pt", add_generation_prompt=True).to(device)
+            
+            # Generate the response from MiniCPM3-4B
+            model_outputs = model.generate(model_inputs, max_new_tokens=1024, top_p=0.7, temperature=0.0)  # Set temperature to 0 for consistency
+
+            # Decode the generated tokens
+            output_token_ids = [model_outputs[i][len(model_inputs[i]):] for i in range(len(model_inputs))]
+            generated_response = tokenizer.batch_decode(output_token_ids, skip_special_tokens=True)[0]
+
+            end_time = time.time()  # End time for the entire process
+            latency = end_time - start_time  # Total time taken for the process
+            
+            # Return all relevant metrics and the generated response
+            return {
+                'node_url': node_url,
+                'response': generated_response,
+                'latency': latency,
+                'response_time': latency,  # For local models, latency equals response time
+                'model': 'MiniCPM3-4B'
+            }
+
+        except Exception as e:
+            print(f"Request failed: {e}. Attempt {attempt + 1} of {retries}. Retrying...")
+            attempt += 1
+            time.sleep(1)  # Brief pause before retrying
+
+    # If all attempts fail
+    return {
+        'node_url': node_url,
+        'response': None,
+        'latency': None,
+        'response_time': None,
+        'model': 'MiniCPM3-4B'
+    }
+
+# Define the nodes' URLs
+node0_url = 'http://127.0.0.1:26657'
+node1_url = 'http://127.0.0.1:26667'
+
+# Test the MiniCPM3-4B model on both nodes
+node0_metrics = test_minicpm_model(node0_url, minicpm_prompt)
+node1_metrics = test_minicpm_model(node1_url, minicpm_prompt)
+
+# Print the metrics for both nodes
+print("Node 0 Metrics (MiniCPM3-4B):", node0_metrics)
+print("Node 1 Metrics (MiniCPM3-4B):", node1_metrics)

@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  node0:
+    image: ghcr.io/cosmos/cosmos-sdk:0.46.0
+    command: simd start --home /cosmos-sdk/node0
+    environment:
+      - DOCKER_REGISTRY_AUTH_BASE64=
+    ports:
+      - "26657:26657"
+      - "26656:26656"
+    volumes:
+      - ./node0:/cosmos-sdk/node0
+  node1:
+    image: ghcr.io/cosmos/cosmos-sdk:0.46.0
+    command: simd start --home /cosmos-sdk/node1
+    environment:
+      - DOCKER_REGISTRY_AUTH_BASE64=
+    ports:
+      - "26667:26657"
+      - "26666:26656"
+    volumes:
+      - ./node1:/cosmos-sdk/node1
